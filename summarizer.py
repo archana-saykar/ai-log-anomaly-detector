@@ -1,0 +1,146 @@
+import json
+import urllib.request
+import urllib.error
+import os
+from datetime import datetime
+
+ANOMALIES_FILE = "logs/anomalies.json"
+REPORT_FILE    = "logs/incident_report.txt"
+API_URL        = "https://api.anthropic.com/v1/messages"
+
+# ── Step 1: Load anomalies from detector output ────────────────────────────────
+def load_anomalies(filepath):
+    """
+    Read the anomalies.json file saved by detector.py
+    """
+    with open(filepath, "r") as f:
+        return json.load(f)
+
+
+# ── Step 2: Format anomalies into a readable prompt ───────────────────────────
+def build_prompt(anomalies):
+    """
+    Convert anomaly records into a clear prompt for Claude.
+    The better the prompt, the better the incident report.
+    """
+    lines = []
+    for a in anomalies:
+        lines.append(
+            f"- [{a['timestamp']}] {a['method']} {a['endpoint']} | "
+            f"status={a['status']} | latency={a['latency_ms']}ms | "
+            f"anomaly_score={a['anomaly_score']:.4f}"
+        )
+
+    anomaly_text = "\n".join(lines)
+
+    prompt = f"""You are a Senior Site Reliability Engineer analyzing a production incident.
+
+The following log entries were flagged as anomalies by an automated ML detection system (Isolation Forest).
+Anomaly score: the more negative the score, the more severe the anomaly.
+
+FLAGGED LOG ENTRIES:
+{anomaly_text}
+
+Please provide a structured incident report with the following sections:
+
+1. INCIDENT SUMMARY
+   - What happened in plain English (2-3 sentences)
+
+2. AFFECTED SERVICES
+   - Which endpoints and services are impacted
+
+3. ROOT CAUSE ANALYSIS
+   - Most likely cause based on the patterns you see
+
+4. SEVERITY
+   - Rate as P1/P2/P3 and explain why
+
+5. RECOMMENDED ACTIONS
+   - Immediate steps the on-call engineer should take
+   - Longer term preventive measures
+
+Keep the tone professional, concise, and actionable — like a real incident report."""
+
+    return prompt
+
+
+# ── Step 3: Call Claude API ────────────────────────────────────────────────────
+def call_claude(prompt, api_key):
+    """
+    Send the prompt to Claude API and get back the incident report.
+    Uses urllib (built into Python) so no extra libraries needed.
+    """
+    headers = {
+        "Content-Type":         "application/json",
+        "x-api-key":            api_key,
+        "anthropic-version":    "2023-06-01"
+    }
+
+    body = json.dumps({
+        "model":      "claude-haiku-4-5-20251001",  # fast + cheapest model, great for summaries
+        "max_tokens": 1024,
+        "messages": [
+            {"role": "user", "content": prompt}
+        ]
+    }).encode("utf-8")
+
+    req = urllib.request.Request(API_URL, data=body, headers=headers, method="POST")
+
+    try:
+        with urllib.request.urlopen(req) as response:
+            result = json.loads(response.read().decode("utf-8"))
+            return result["content"][0]["text"]
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode("utf-8")
+        raise Exception(f"API Error {e.code}: {error_body}")
+
+
+# ── Step 4: Save and print the report ─────────────────────────────────────────
+def save_report(report_text, anomaly_count):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    full_report = f"""
+{'='*60}
+AUTOMATED INCIDENT REPORT
+Generated : {timestamp}
+Anomalies : {anomaly_count} flagged entries
+{'='*60}
+
+{report_text}
+
+{'='*60}
+END OF REPORT
+{'='*60}
+"""
+    with open(REPORT_FILE, "w") as f:
+        f.write(full_report)
+
+    print(full_report)
+    print(f"💾 Report saved to {REPORT_FILE}")
+
+
+# ── Main ───────────────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    # Get API key from environment variable (secure — never hardcode keys)
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        print("❌ ANTHROPIC_API_KEY not set.")
+        print("   Run: export ANTHROPIC_API_KEY='your-key-here'")
+        print("   Get your free key at: https://console.anthropic.com")
+        exit(1)
+
+    print("📂 Loading anomalies from detector output...")
+    anomalies = load_anomalies(ANOMALIES_FILE)
+
+    if not anomalies:
+        print("❌ No anomalies found in logs/anomalies.json")
+        print("   Run detector.py first after generating some anomaly logs")
+        exit(1)
+
+    print(f"✅ Found {len(anomalies)} anomalies")
+    print("🤖 Sending to Claude API for incident analysis...")
+
+    prompt = build_prompt(anomalies)
+    report = call_claude(prompt, api_key)
+
+    print("\n✅ Incident report generated!\n")
+    save_report(report, len(anomalies))
