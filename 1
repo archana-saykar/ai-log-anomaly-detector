@@ -5,6 +5,7 @@ import os
 from datetime import datetime
 
 from slack_alert import send_slack_alert
+send_slack_alert(anomaly_count, report_text)
 ANOMALIES_FILE = "logs/anomalies.json"
 REPORT_FILE    = "logs/incident_report.txt"
 API_URL        = "https://api.anthropic.com/v1/messages"
@@ -117,7 +118,7 @@ END OF REPORT
 
     print(full_report)
     print(f"💾 Report saved to {REPORT_FILE}")
-    send_slack_alert(anomaly_count, report_text)
+
 
 # ── Main ───────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
