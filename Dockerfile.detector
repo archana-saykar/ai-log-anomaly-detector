@@ -1,0 +1,14 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.detector.txt .
+RUN pip install --no-cache-dir -r requirements.detector.txt
+
+COPY detector.py .
+COPY summarizer.py .
+
+# logs folder shared with app container via volume
+RUN mkdir -p logs
+
+CMD ["python", "detector.py"]

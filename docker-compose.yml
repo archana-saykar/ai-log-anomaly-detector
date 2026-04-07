@@ -1,0 +1,33 @@
+version: "3.9"
+
+services:
+
+  # ── Container 1: Flask app that generates logs ─────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: log_generator
+    ports:
+      - "5000:5000"
+    volumes:
+      - logs_data:/app/logs    # share logs folder with detector
+    restart: unless-stopped
+
+  # ── Container 2: Detector + Summarizer ─────────────────────────
+  detector:
+    build:
+      context: .
+      dockerfile: Dockerfile.detector
+    container_name: log_detector
+    volumes:
+      - logs_data:/app/logs    # reads from same logs folder
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}   # passed from your .env file
+    depends_on:
+      - app                    # waits for app to start first
+    restart: unless-stopped
+
+# ── Shared volume between both containers ──────────────────────
+volumes:
+  logs_data:
