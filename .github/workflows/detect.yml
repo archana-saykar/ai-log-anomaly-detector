@@ -1,0 +1,66 @@
+name: Anomaly Detection Pipeline
+
+on:
+  # Run automatically every 15 minutes
+  schedule:
+    - cron: '*/15 * * * *'
+
+  # Also allow manual trigger from GitHub UI
+  workflow_dispatch:
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Check out the code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Step 3: Install dependencies
+      - name: Install dependencies
+        run: |
+          pip install flask pandas scikit-learn requests
+
+      # Step 4: Generate sample logs
+      # In production this would read real logs from your server
+      # For demo purposes we start the Flask app, generate logs, then stop it
+      - name: Generate sample logs
+        run: |
+          mkdir -p logs
+          python3 app.py &
+          APP_PID=$!
+          sleep 3
+          curl -s "http://localhost:5000/simulate?n=100" > /dev/null
+          curl -s "http://localhost:5000/simulate/anomaly" > /dev/null
+          sleep 2
+          kill $APP_PID || true
+
+      # Step 5: Run anomaly detector
+      - name: Run anomaly detector
+        run: |
+          python3 detector.py
+
+      # Step 6: Run AI summarizer only if anomalies were found
+      - name: Run AI summarizer
+        if: hashFiles('logs/anomalies.json') != ''
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          python3 summarizer.py
+
+      # Step 7: Upload logs as artifacts so you can inspect them
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: detection-logs-${{ github.run_number }}
+          path: logs/
+          retention-days: 7
