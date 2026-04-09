@@ -42,7 +42,6 @@ jobs:
           python3 detector.py
 
       - name: Run AI summarizer
-        if: hashFiles('logs/anomalies.json') != ''
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
