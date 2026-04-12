@@ -1,6 +1,8 @@
-# AI-Powered Log Anomaly Detector
+# AI-Powered Log Anomaly Detector 
 
 An end-to-end monitoring system built with Python, Scikit-learn, Docker, and Claude AI — that detects failures using ML and sends AI-generated incident reports to Slack automatically.
+## Demo
+[Watch the demo video](https://1drv.ms/v/c/6861f1d77fed1f04/IQA0QAkbolQETo-HaXIGV4TnAehr34zrLZ6549dB7gsBC7M?e=dYTr6G)
 
 ---
 
@@ -209,8 +211,6 @@ Averages hide tail behavior. p95 catches situations where most users are fine bu
 Overall metrics tell you something is wrong. Per-endpoint breakdown tells Claude exactly which service is failing — enabling precise root cause analysis.
 
 ---
-## Demo
-[Watch the demo video](https://1drv.ms/v/c/6861f1d77fed1f04/IQA0QAkbolQETo-HaXIGV4TnAehr34zrLZ6549dB7gsBC7M?e=dYTr6G)
 
 ## Author
 **Archana Saykar**
